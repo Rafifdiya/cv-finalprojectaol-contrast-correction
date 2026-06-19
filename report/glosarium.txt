@@ -1,0 +1,631 @@
+====================================================
+GLOSARIUM — Automated Contrast Correction System
+COMP7116001 Computer Vision | Team 2 | Binus University
+====================================================
+Istilah teknis yang digunakan dalam project, diurutkan A–Z
+====================================================
+
+
+====================================================
+A
+====================================================
+
+Adaptive Histogram Equalization (AHE)
+  Varian dari histogram equalization yang membagi gambar ke dalam tile-tile
+  lokal dan melakukan equalization secara terpisah per tile. Hasilnya lebih
+  detail-preserving dibanding GHE. CLAHE adalah pengembangan dari AHE dengan
+  tambahan clip limit untuk kontrol noise.
+
+Artifact
+  Distorsi visual yang tidak diinginkan pada gambar hasil pemrosesan.
+  Pada CLAHE, artifact yang umum adalah "tiling artifact" — garis atau batas
+  anggap visible di tepi antar tile jika parameter tidak tepat. Pada GHE,
+  artifact berupa over-brightening di area tertentu.
+
+
+====================================================
+B
+====================================================
+
+Baseline
+  Metode pembanding paling sederhana yang digunakan sebagai acuan evaluasi.
+  Dalam project ini, GHE berfungsi sebagai baseline — semua hasil CLAHE
+  dibandingkan terhadap GHE untuk menunjukkan improvement.
+
+BGR
+  Format channel warna yang digunakan OpenCV: Blue–Green–Red. Berbeda dari
+  konvensi umum RGB. Semua operasi cv2 menggunakan BGR secara default.
+  Konversi ke LAB di project ini dilakukan dari BGR → LAB, bukan RGB → LAB.
+
+Brightness
+  Tingkat kecerahan keseluruhan gambar, diukur sebagai rata-rata intensitas
+  pixel. Gambar underexposed memiliki brightness rendah; overexposed tinggi.
+  Dalam sistem ini, brightness diukur dari mean L channel di LAB space.
+
+
+====================================================
+C
+====================================================
+
+CDF (Cumulative Distribution Function)
+  Fungsi kumulatif dari histogram intensitas gambar. Untuk setiap level
+  intensitas r, CDF(r) = jumlah pixel dengan intensitas ≤ r dibagi total
+  pixel. GHE menggunakan CDF sebagai fungsi transformasi untuk menghasilkan
+  distribusi output yang uniform. Formula: s = (L−1) × CDF(r).
+
+CIELAB (LAB)
+  Color space yang dirancang untuk perceptual uniformity — jarak antar dua
+  titik di ruang LAB berkorelasi dengan perbedaan warna yang dirasakan
+  manusia. Terdiri dari tiga channel: L (Lightness, 0–100), A (green–red
+  axis), B (blue–yellow axis). Dalam project ini, semua enhancement
+  dilakukan di channel L saja, tanpa menyentuh A dan B.
+
+CLAHE (Contrast Limited Adaptive Histogram Equalization)
+  Metode enhancement kontras utama dalam project ini. Bekerja dengan membagi
+  gambar ke grid tile (N×N), melakukan histogram equalization per tile, dan
+  membatasi redistribusi histogram dengan clip limit. Mengatasi dua kelemahan
+  GHE: noise amplification dan kurangnya adaptivitas lokal.
+
+Clip Limit
+  Parameter CLAHE yang menentukan batas maksimal tinggi bar histogram per
+  tile sebelum redistribusi. Pixel yang "overflow" di atas batas ini
+  didistribusikan merata ke seluruh bin histogram — tidak dibuang.
+  Nilai rendah (1.0): enhancement minimal, noise terkontrol.
+  Nilai tinggi (8.0+): enhancement agresif, rawan noise amplification.
+  Optimal di project ini: 4.0.
+
+Classifier
+  Model machine learning yang memetakan input ke kelas/label diskrit.
+  Dalam project ini, Exposure Classifier memetakan 10 fitur histogram
+  ke tiga kelas: underexposed, normal, atau overexposed.
+
+Color Space
+  Representasi matematis warna dalam koordinat tertentu. Contoh: RGB
+  (Red-Green-Blue), HSV (Hue-Saturation-Value), LAB (Lightness-A-B).
+  Pemilihan color space berpengaruh signifikan pada hasil image processing —
+  project ini memilih LAB untuk memisahkan luminance dari chrominance.
+
+Contrast
+  Perbedaan intensitas antara area terang dan gelap dalam gambar. Gambar
+  berkontrast tinggi memiliki range intensitas lebar; low contrast sempit.
+  Dalam project ini, contrast diukur sebagai P90 − P10 (selisih persentil
+  ke-90 dan ke-10 dari histogram L channel).
+
+Cross-Validation (CV)
+  Teknik evaluasi model ML yang membagi dataset ke K fold, melatih model
+  K kali dengan setiap fold sebagai validation set sekali. Menghasilkan
+  estimasi performa yang lebih robust dibanding single train/test split.
+  Project ini menggunakan 5-fold CV untuk evaluasi classifier dan predictor.
+
+
+====================================================
+D
+====================================================
+
+Dataset
+  Kumpulan data yang digunakan untuk training dan evaluasi model.
+  Project ini menggunakan dua dataset:
+  (1) LOL Dataset — 485 pasang low/normal untuk pipeline utama dan ML
+  (2) SICE Part2 — 186 foto overexposed asli untuk kelas overexposed classifier.
+
+Deep Learning
+  Subset machine learning yang menggunakan neural network berlapis dalam
+  (deep neural network) untuk belajar representasi fitur secara otomatis
+  dari data mentah. State-of-the-art untuk image enhancement (RetinexNet,
+  EnlightenGAN) menggunakan deep learning dan mencapai SSIM 0.55–0.75 di
+  LOL dataset, lebih tinggi dari metode classical (0.40–0.50).
+
+Dynamic Range
+  Rasio antara intensitas tertinggi dan terendah yang dapat direpresentasikan
+  atau direkam oleh sistem. Kamera dengan dynamic range tinggi bisa menangkap
+  detail di shadow dan highlight sekaligus. Histogram equalization bertujuan
+  memanfaatkan full dynamic range yang tersedia.
+
+
+====================================================
+E
+====================================================
+
+Enhancement
+  Proses meningkatkan kualitas visual gambar — bisa berupa peningkatan
+  kontras, kecerahan, ketajaman, atau pengurangan noise. Dalam project ini,
+  "enhancement" merujuk spesifik pada koreksi kontras berbasis histogram.
+
+Ensemble Method
+  Teknik ML yang menggabungkan prediksi dari banyak model (base learners)
+  untuk menghasilkan prediksi akhir yang lebih robust. Random Forest adalah
+  ensemble dari banyak decision tree — setiap tree dilatih pada subset data
+  dan fitur yang berbeda (bagging), prediksi akhir dari voting mayoritas.
+
+Entropy (Histogram Entropy)
+  Ukuran information content dari distribusi intensitas gambar. Dihitung
+  sebagai: H = −Σ p(i) × log₂(p(i)) untuk semua bin histogram. Nilai tinggi
+  artinya distribusi lebih merata dan bervariasi — gambar mengandung lebih
+  banyak informasi visual. Digunakan sebagai no-reference metric dalam
+  evaluasi kualitas enhancement.
+
+Exposure
+  Jumlah cahaya yang diterima sensor kamera saat merekam gambar. Dipengaruhi
+  oleh tiga faktor: aperture (f-stop), shutter speed, dan ISO. Exposure tidak
+  tepat menghasilkan gambar underexposed (terlalu gelap) atau overexposed
+  (terlalu terang).
+
+Exposure Classifier
+  Komponen ML pertama dalam sistem ini. Random Forest Classifier dengan
+  100 trees yang menerima 10 fitur histogram L channel dan mengklasifikasikan
+  gambar ke tiga kelas: underexposed, normal, atau overexposed.
+  Akurasi 5-fold CV: 96.28% ±1.61%.
+
+
+====================================================
+F
+====================================================
+
+Feature Engineering
+  Proses memilih, membuat, dan mentransformasi variabel input (fitur) untuk
+  model ML. Dalam project ini, 10 fitur statistik diekstrak dari histogram
+  L channel: mean, std, skewness, kurtosis, p10, p25, p75, p90, contrast
+  ratio, dan entropy.
+
+Feature Importance
+  Metrik Random Forest yang mengukur kontribusi setiap fitur terhadap
+  keputusan prediksi. Dihitung berdasarkan penurunan impurity (Gini) rata-rata
+  yang disebabkan oleh pemisahan di fitur tersebut. Membantu interpretasi
+  model dan identifikasi fitur yang paling diskriminatif.
+
+Fold
+  Satu subset data dalam k-fold cross-validation. Dengan 5-fold CV dan
+  dataset 1156 sampel, setiap fold berisi ~231 sampel sebagai validation
+  set dan ~925 sampel sebagai training set.
+
+
+====================================================
+G
+====================================================
+
+GHE (Global Histogram Equalization)
+  Metode klasik contrast enhancement yang menerapkan transformasi global
+  berbasis CDF histogram ke seluruh gambar. Formula: s = (L−1) × CDF(r).
+  Cepat dan mudah diimplementasi. Kelemahan: noise amplification di area
+  homogen dan tidak adaptif terhadap variasi lokal dalam gambar. Digunakan
+  sebagai baseline dalam project ini.
+
+Gamma Correction
+  Teknik sederhana untuk mengatur kecerahan gambar dengan menerapkan fungsi
+  pangkat: output = input^(1/gamma). Gamma < 1 mencerahkan gambar; gamma > 1
+  menggelapkan. Tidak mengubah distribusi histogram seperti equalization —
+  hanya rescale intensitas secara global. Tidak dipilih sebagai metode utama
+  karena terlalu sederhana dan tidak adaptive.
+
+Grid Search
+  Metode systematic hyperparameter tuning yang mengevaluasi semua kombinasi
+  parameter yang ditentukan. Project ini melakukan grid search 12 kombinasi
+  (clip_limit × tile_size) pada 485 gambar training untuk menemukan
+  parameter CLAHE optimal secara empiris.
+
+Ground Truth
+  Gambar referensi "ideal" yang digunakan sebagai acuan evaluasi kuantitatif.
+  Dalam LOL dataset, ground truth adalah foto normal-light yang diambil di
+  scene yang sama dengan foto low-light. Digunakan untuk menghitung PSNR
+  dan SSIM. Tidak selalu tersedia dalam penggunaan real-world.
+
+
+====================================================
+H
+====================================================
+
+Highlight
+  Area dalam gambar dengan intensitas sangat tinggi (mendekati putih).
+  Pada gambar overexposed, highlight "blown out" — semua detail hilang
+  karena saturasi sensor. Histogram equalization berusaha mengembalikan
+  detail di area ini.
+
+Histogram
+  Representasi distribusi frekuensi intensitas pixel dalam gambar.
+  Sumbu X: level intensitas (0–255 untuk 8-bit). Sumbu Y: jumlah pixel
+  dengan intensitas tersebut. Histogram adalah dasar dari semua teknik
+  enhancement dalam project ini.
+
+Histogram Uniformity
+  No-reference metric yang mengukur seberapa rata distribusi histogram.
+  Dihitung sebagai 1 − (std histogram / max_std_possible). Nilai tinggi
+  artinya distribusi mendekati flat/uniform — indikasi kontras yang baik.
+  Digunakan ketika ground truth tidak tersedia.
+
+HSV
+  Color space: Hue (warna), Saturation (kejenuhan), Value (kecerahan).
+  Alternatif untuk LAB dalam image processing. Value channel di HSV tidak
+  memisahkan lightness dari saturation secara perceptually uniform seperti
+  L channel di LAB, sehingga LAB lebih dipilih untuk enhancement yang
+  menghasilkan hasil natural.
+
+
+====================================================
+I
+====================================================
+
+Image Enhancement
+  Lihat "Enhancement".
+
+Intensity
+  Nilai kecerahan pixel dalam gambar grayscale atau satu channel dari
+  gambar berwarna. Range 0 (hitam) hingga 255 (putih) untuk gambar 8-bit.
+
+ISO
+  Sensitivitas sensor kamera terhadap cahaya. ISO tinggi memungkinkan
+  foto di kondisi gelap tapi menghasilkan lebih banyak noise digital.
+  Gambar LOL dataset diambil dengan kombinasi shutter speed dan ISO bervariasi
+  untuk menciptakan pasangan low-light dan normal-light dari scene yang sama.
+
+
+====================================================
+J
+====================================================
+
+joblib
+  Library Python untuk serialisasi objek Python (termasuk model ML scikit-learn)
+  ke file .pkl dan load kembali ke memory. Digunakan untuk menyimpan dan
+  memuat tiga model ML dalam project ini (exposure_classifier.pkl,
+  param_predictor_clip.pkl, param_predictor_tile.pkl).
+
+
+====================================================
+K
+====================================================
+
+Kurtosis
+  Ukuran statistik yang menggambarkan "keruncingan" atau "ketebalan ekor"
+  distribusi. Kurtosis tinggi: distribusi peaky/leptokurtic — banyak pixel
+  berkumpul di range intensitas sempit (ciri gambar low contrast).
+  Kurtosis rendah: distribusi flat/platykurtic. Salah satu dari 10 fitur
+  ML dalam project ini.
+
+
+====================================================
+L
+====================================================
+
+LAB
+  Lihat "CIELAB".
+
+Laplacian Variance
+  Ukuran sharpness/noise gambar menggunakan Laplacian filter. Laplacian
+  mendeteksi perubahan intensitas cepat (tepi dan noise). Variance tinggi
+  bisa berarti gambar tajam ATAU banyak noise. Dalam heuristic scoring
+  best result, Laplacian variance digunakan sebagai noise penalty:
+  NoiseScore = 1 / (1 + Laplacian_variance / 800).
+
+L Channel
+  Channel Lightness dalam color space CIELAB, range 0–100. Merepresentasikan
+  kecerahan perceptual dari gambar, terpisah dari informasi warna. Semua
+  operasi enhancement dalam project ini (GHE, CLAHE) dan feature extraction
+  untuk ML dilakukan pada L channel saja.
+
+LOL Dataset
+  Low-Light dataset dari Wei et al., BMVC 2018. Berisi 500 pasang gambar
+  (485 train + 15 test) dari scene yang sama diambil pada kondisi pencahayaan
+  berbeda: satu foto low-light dan satu ground truth normal-light. Format PNG.
+  Diakses via Kaggle. Dataset standar untuk benchmarking low-light enhancement.
+
+Low-Light Enhancement
+  Subfield computer vision yang berfokus pada memperbaiki kualitas gambar
+  yang diambil dalam kondisi cahaya rendah. Mencakup metode histogram-based
+  (GHE, CLAHE), Retinex-based, dan deep learning. Project ini termasuk dalam
+  kategori ini meski juga menangani kasus overexposed.
+
+
+====================================================
+M
+====================================================
+
+MAE (Mean Absolute Error)
+  Metrik evaluasi untuk model regresi. Rata-rata selisih absolut antara
+  nilai prediksi dan nilai aktual. MAE clip limit predictor = 0.0837 artinya
+  rata-rata prediksi clip limit meleset 0.0837 dari nilai optimal.
+  Formula: MAE = (1/N) × Σ |y_pred − y_actual|.
+
+Machine Learning (ML)
+  Subset artificial intelligence di mana model belajar pola dari data tanpa
+  diprogram secara eksplisit untuk setiap aturan. Dalam project ini, ML
+  digunakan untuk dua task: klasifikasi exposure (supervised classification)
+  dan prediksi parameter CLAHE (supervised regression dan classification).
+
+matplotlib
+  Library Python untuk visualisasi data dan plotting. Digunakan dalam project
+  ini untuk membuat histogram comparison plot di Streamlit app dan generate
+  semua visualisasi training (confusion matrix, feature importance, dll.)
+  di experiments/plots/. Wajib menggunakan Agg backend (non-interactive)
+  untuk compatibility dengan Streamlit Cloud.
+
+Mean Brightness
+  Rata-rata intensitas L channel seluruh pixel gambar. Feature pertama dari
+  10 fitur ML. Gambar underexposed: mean rendah (< 80). Gambar normal: mean
+  sedang (80–150). Gambar overexposed: mean tinggi (> 150).
+
+Metrics
+  Ukuran kuantitatif untuk mengevaluasi kualitas output sistem.
+  Project ini menggunakan empat metrik:
+  - PSNR: reference-based, mengukur pixel-wise fidelity
+  - SSIM: reference-based, mengukur structural similarity
+  - Histogram Uniformity: no-reference, mengukur distribusi merata
+  - Entropy: no-reference, mengukur information content
+
+Model
+  Dalam konteks ML: representasi matematis yang belajar dari data training
+  untuk membuat prediksi pada data baru. Project ini memiliki tiga saved
+  model: exposure_classifier.pkl, param_predictor_clip.pkl,
+  param_predictor_tile.pkl — semuanya Random Forest.
+
+MSE (Mean Squared Error)
+  Rata-rata kuadrat selisih antara pixel prediksi dan pixel ground truth.
+  PSNR dihitung dari MSE. MSE sensitif terhadap outlier karena dikuadratkan.
+
+
+====================================================
+N
+====================================================
+
+No-Reference Metrics
+  Metrik evaluasi kualitas gambar yang tidak memerlukan gambar referensi
+  (ground truth). Digunakan ketika hanya ada gambar output tanpa pasangan
+  ground truth. Project ini menggunakan Histogram Uniformity dan Entropy
+  sebagai no-reference metrics. Selalu ditampilkan di app terlepas dari
+  apakah user upload ground truth atau tidak.
+
+Noise
+  Variasi intensitas pixel yang tidak diinginkan, bukan bagian dari konten
+  gambar asli. Noise digital berasal dari sensor kamera (thermal noise,
+  shot noise) dan semakin nyata di kondisi low-light atau ISO tinggi.
+  GHE cenderung amplify noise; CLAHE mengendalikan ini dengan clip limit.
+
+Noise Amplification
+  Fenomena di mana proses enhancement meningkatkan visibilitas noise
+  yang sudah ada di gambar. GHE rentan terhadap ini karena transformasi
+  globalnya tidak membedakan antara "detail" dan "noise". CLAHE mengurangi
+  noise amplification dengan clip limit.
+
+Normal Exposure
+  Kondisi gambar di mana tingkat kecerahan dan kontras dalam rentang ideal
+  — tidak terlalu gelap, tidak terlalu terang. Ground truth dalam LOL dataset
+  adalah gambar normal-exposure. Classifier mendeteksi gambar normal dan
+  memunculkan warning bahwa enhancement akan minimal.
+
+
+====================================================
+O
+====================================================
+
+OpenCV (cv2)
+  Library computer vision open-source untuk Python dan C++. Digunakan
+  dalam project ini untuk: konversi color space (cv2.cvtColor),
+  implementasi CLAHE (cv2.createCLAHE), load/save gambar, dan operasi
+  image processing lainnya. Versi yang digunakan: opencv-python-headless
+  (kompatibel dengan server tanpa GUI seperti Streamlit Cloud).
+
+Overexposed
+  Kondisi gambar terlalu terang karena sensor menerima terlalu banyak cahaya.
+  Histogram terkonsentrasi di intensitas tinggi. Highlight blown out —
+  detail di area terang hilang irreversibly. Dalam project ini, gambar
+  overexposed ditangani dengan CLAHE yang menekan histogram di area tinggi.
+
+Oversampling
+  Teknik untuk mengatasi class imbalance dengan memperbanyak sampel dari
+  kelas minoritas. SMOTE (Synthetic Minority Oversampling Technique) adalah
+  metode populer yang generate sampel sintetis dengan interpolasi antar
+  data point kelas minoritas. Disebutkan sebagai potential improvement untuk
+  mengatasi imbalance 186 vs 485 dalam project ini.
+
+
+====================================================
+P
+====================================================
+
+pandas
+  Library Python untuk manipulasi data tabular (DataFrame). Digunakan dalam
+  project ini untuk logging hasil eksperimen grid search ke experiments/
+  results.csv dan manipulasi data training ML.
+
+Parameter Predictor
+  Komponen ML kedua dalam sistem ini. Terdiri dari dua model Random Forest:
+  (1) Regressor untuk prediksi clip_limit (MAE 0.0837)
+  (2) Classifier untuk prediksi tile_size (accuracy 99.59%)
+  Dilatih dengan label dari hasil grid search (kombinasi optimal per gambar).
+
+Percentile
+  Nilai di bawah mana persentase tertentu dari data jatuh. P10 = nilai
+  intensitas di mana 10% pixel memiliki intensitas lebih rendah. P90 = nilai
+  di mana 90% pixel lebih rendah. Digunakan sebagai fitur ML karena
+  merepresentasikan distribusi histogram secara robust terhadap outlier.
+
+pkl (Pickle)
+  Format serialisasi objek Python. Model ML yang sudah dilatih disimpan
+  sebagai file .pkl menggunakan joblib dan di-load kembali saat inference
+  tanpa perlu training ulang.
+
+Pipeline
+  Urutan proses yang mengubah input menjadi output. Pipeline dalam project:
+  Input foto → Ekstrak fitur → ML Classifier → ML Predictor → CLAHE/GHE
+  di L channel → Output + Metrics.
+
+PSNR (Peak Signal-to-Noise Ratio)
+  Metrik evaluasi reference-based yang mengukur kualitas rekonstruksi gambar.
+  Dihitung dari MSE terhadap ground truth. Unit: dB (decibel). Nilai lebih
+  tinggi = lebih baik. Formula: PSNR = 10 × log₁₀(MAX² / MSE).
+  GHE di dataset ini: 15.33 dB. CLAHE terbaik: 10.54 dB. PSNR tidak
+  berkorelasi baik dengan persepsi visual manusia — SSIM lebih diprioritaskan.
+
+
+====================================================
+R
+====================================================
+
+Random Forest
+  Ensemble machine learning algorithm yang membangun banyak decision tree
+  (default: 100) dari subset data dan fitur yang berbeda secara acak (bagging
+  + feature randomness). Prediksi akhir dari voting mayoritas (classifier)
+  atau rata-rata (regressor). Robust terhadap overfitting dan outlier.
+  Digunakan untuk semua model ML dalam project ini.
+
+Redistribusi Histogram
+  Proses dalam CLAHE di mana pixel yang melebihi clip limit di suatu bin
+  histogram dibagi merata ke semua bin lain. Ini yang membedakan CLAHE dari
+  AHE biasa dan yang mencegah over-amplification di intensitas tertentu.
+
+Regressor
+  Model ML yang memprediksi nilai kontinu (bukan kelas diskrit). Parameter
+  Predictor menggunakan Random Forest Regressor untuk prediksi clip_limit
+  yang merupakan nilai kontinu (1.0, 1.5, 2.0, ..., 8.0).
+
+RetinexNet
+  Metode deep learning untuk low-light enhancement berbasis teori Retinex
+  (Retinex Theory: persepsi warna stabil terlepas dari pencahayaan dengan
+  memisahkan illumination dari reflectance). Mencapai SSIM ~0.56 di LOL
+  dataset. Lebih baik dari CLAHE tapi membutuhkan GPU dan training data.
+  Disebutkan sebagai future work dalam project ini.
+
+RGB
+  Color space standar: Red–Green–Blue. Setiap channel merepresentasikan
+  intensitas warna tersebut. Direct processing di RGB untuk enhancement
+  menghasilkan color shift karena channel R, G, B saling terkait dalam
+  persepsi warna. OpenCV menggunakan BGR (bukan RGB) secara default.
+
+Rule-Based Fallback
+  Logika kondisional yang diterapkan setelah prediksi model ML untuk
+  menangani kasus edge case. Project ini menggunakan fallback: gambar
+  yang diklasifikasi "normal" tapi memiliki mean > 128 dan P90 > 240
+  di-reklasifikasi ke "overexposed". Meningkatkan robustness tanpa
+  training ulang model.
+
+
+====================================================
+S
+====================================================
+
+scipy
+  Library Python untuk komputasi saintifik. Digunakan dalam project ini
+  untuk menghitung skewness dan kurtosis histogram sebagai fitur ML
+  (scipy.stats.skew dan scipy.stats.kurtosis).
+
+scikit-image (skimage)
+  Library Python untuk image processing saintifik. Digunakan untuk
+  implementasi terstandarisasi PSNR (skimage.metrics.peak_signal_noise_ratio)
+  dan SSIM (skimage.metrics.structural_similarity) yang konsisten dengan
+  konvensi di literatur akademik.
+
+scikit-learn (sklearn)
+  Library machine learning Python. Digunakan untuk Random Forest Classifier,
+  Random Forest Regressor, dan cross-validation (cross_val_score) dalam
+  project ini.
+
+Shadow
+  Area dalam gambar dengan intensitas sangat rendah (mendekati hitam).
+  Pada gambar underexposed, shadow area kehilangan detail karena semua
+  pixel berkumpul di intensitas rendah. CLAHE berusaha mengembalikan
+  detail di shadow dengan equalization lokal.
+
+SICE (Single Image Contrast Enhancement Dataset)
+  Dataset dari Cai et al. yang berisi sequence foto dengan level exposure
+  berbeda (dari sangat underexposed hingga sangat overexposed) untuk ratusan
+  scene. Project ini menggunakan SICE Part2 — mengambil 186 gambar dengan
+  exposure tertinggi (L-channel mean > 155) sebagai real overexposed training
+  data untuk ML Classifier.
+
+Skewness
+  Ukuran asimetri distribusi. Skewness positif: ekor kanan lebih panjang
+  (distribusi condong ke intensitas rendah — ciri underexposed). Skewness
+  negatif: ekor kiri lebih panjang (condong ke intensitas tinggi — ciri
+  overexposed). Salah satu fitur paling diskriminatif dalam exposure classifier.
+
+SSIM (Structural Similarity Index Measure)
+  Metrik evaluasi reference-based yang mengukur kemiripan dua gambar dari
+  tiga aspek: luminance, contrast, dan structure. Range −1 hingga 1; nilai
+  mendekati 1 = sangat mirip. Lebih berkorelasi dengan persepsi visual
+  manusia dibanding PSNR. Digunakan sebagai metrik utama dalam project ini.
+  Formula: SSIM = [l(x,y)]^α × [c(x,y)]^β × [s(x,y)]^γ.
+  CLAHE terbaik: 0.4519. GHE baseline: 0.4431.
+
+Standard Deviation (Std)
+  Ukuran sebaran data dari mean. Untuk histogram L channel, std tinggi artinya
+  intensitas tersebar luas — kontras baik. Std rendah artinya pixel berkumpul
+  di range sempit — kontras rendah. Salah satu dari 10 fitur ML.
+
+Streamlit
+  Framework Python untuk membangun web application data science dan ML secara
+  cepat tanpa HTML/CSS/JS. Digunakan untuk membangun demo app dalam project ini.
+  Mendukung widget interaktif (slider, upload, download), layout kolom, dan
+  deployment ke Streamlit Cloud.
+
+Synthesized Data
+  Data yang dibuat secara artifisial, bukan dari pengukuran/rekaman nyata.
+  Dalam project ini, overexposed data awalnya dibuat dengan men-brighten
+  foto normal dari LOL menggunakan gamma correction. Setelah diganti dengan
+  real SICE data, akurasi classifier naik dari 86.74% ke 96.28%.
+
+
+====================================================
+T
+====================================================
+
+Tile
+  Blok rectangular gambar dalam grid CLAHE. Gambar dibagi ke N×N tile,
+  histogram equalization dilakukan secara independen per tile. Bilinear
+  interpolation digunakan di batas antar tile untuk transisi yang smooth.
+
+Tile Size
+  Ukuran grid tile dalam CLAHE. Dinyatakan sebagai (width, height) pixel
+  atau jumlah tile per dimensi. Project ini mencoba tile grid 4×4, 8×8,
+  dan 16×16. Tile 4×4 memberikan SSIM tertinggi di dataset ini karena
+  adaptivitas lokal lebih tinggi.
+
+
+====================================================
+U
+====================================================
+
+Underexposed
+  Kondisi gambar terlalu gelap karena sensor menerima terlalu sedikit cahaya.
+  Histogram terkonsentrasi di intensitas rendah. Detail di shadow area hilang.
+  485 sampel underexposed dari LOL dataset digunakan sebagai training data.
+
+Uniformity
+  Lihat "Histogram Uniformity".
+
+
+====================================================
+V
+====================================================
+
+Variance
+  Kuadrat dari standard deviation. Dalam konteks image processing, variance
+  intensitas mengukur sebaran nilai pixel. Laplacian variance digunakan
+  sebagai proxy untuk noise level dalam heuristic scoring.
+
+Visualization
+  Representasi visual dari data atau hasil eksperimen. Project ini generate
+  delapan plot di experiments/plots/: confusion matrix, feature importance
+  chart, CV score plot, scatter actual vs predicted, parameter distribution
+  histogram, SSIM heatmap clip×tile, dan bar chart GHE vs CLAHE.
+
+
+====================================================
+W
+====================================================
+
+Web Application
+  Aplikasi yang diakses melalui browser web. Demo sistem dalam project ini
+  dibangun sebagai web app menggunakan Streamlit, dapat diakses di
+  localhost:8501 atau di-deploy ke Streamlit Cloud dengan URL publik.
+
+
+====================================================
+Z
+====================================================
+
+Zero-reference / No-reference
+  Lihat "No-Reference Metrics".
+
+====================================================
+END OF GLOSSARY
+====================================================
+Total: 60+ istilah, A–Z
+====================================================

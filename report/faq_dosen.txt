@@ -1,0 +1,297 @@
+====================================================
+FAQ DOSEN — Antisipasi Pertanyaan Presentasi
+Automated Contrast Correction System
+COMP7116001 Computer Vision | Team 2 | Binus University
+====================================================
+
+
+====================================================
+SECTION 1 — DATASET
+====================================================
+
+Q1: Kenapa pakai LOL dataset? Kenapa tidak dataset lain?
+A: LOL adalah benchmark standar untuk low-light enhancement yang paling banyak
+   dipakai di literatur. Tersedia gratis via Kaggle, sudah paired (low + ground
+   truth), format PNG, dan resolusi cukup besar (485 train + 15 test pairs).
+   Ini memudahkan evaluasi dengan metrik reference-based seperti PSNR dan SSIM.
+
+Q2: LOL dataset kan cuma low-light. Bagaimana handle overexposed?
+A: LOL memang tidak punya kelas overexposed. Awalnya kami generate synthetic
+   overexposed dengan men-brighten foto normal dari LOL pakai gamma correction.
+   Akurasi classifier waktu itu 86.74%. Setelah kami ganti ke real overexposed
+   dari SICE Part2 (186 gambar dengan L-channel mean > 155), akurasi naik ke
+   96.28%. Ini konfirmasi bahwa synthesized data kalah jauh dari real data.
+
+Q3: 485 gambar itu cukup tidak untuk training ML?
+A: Untuk Random Forest dengan 10 fitur statistik, 485 sampel sudah representatif.
+   Random Forest tidak memerlukan data sebesar deep learning. Buktinya: 5-fold
+   cross-validation menghasilkan akurasi 96.28% dengan std 1.61% — std kecil
+   artinya model konsisten di semua fold, tidak overfit ke subset tertentu.
+
+Q4: Data 15 test pairs itu sangat sedikit. Tidak masalah?
+A: Betul, ini limitasi. Test set 15 pairs dipakai hanya untuk demonstrasi
+   kualitatif, bukan evaluasi statistik. Evaluasi utama kami dilakukan di
+   training set dengan cross-validation (485 gambar). Idealnya memang butuh
+   test set lebih besar untuk klaim generalisasi yang lebih kuat.
+
+Q5: Kenapa SICE hanya ambil 186 gambar? Bisa lebih banyak tidak?
+A: Kami filter berdasarkan L-channel mean > 155 untuk memastikan yang diambil
+   benar-benar overexposed, bukan sekadar normal-bright. Dari SICE Part2,
+   186 gambar yang memenuhi kriteria itu. Mengambil gambar dengan threshold
+   lebih rendah berisiko memasukkan gambar ambiguous yang justru membingungkan
+   classifier.
+
+
+====================================================
+SECTION 2 — METODE CV (GHE & CLAHE)
+====================================================
+
+Q6: Kenapa bekerja di LAB color space, bukan RGB atau HSV?
+A: Di RGB, mengubah satu channel langsung affect hue dan saturation — hasil
+   enhancement sering terlihat color shift yang tidak natural. Di HSV, channel
+   V (value) tidak memisahkan lightness dari saturation secara perceptually
+   uniform. LAB dirancang khusus untuk perceptual uniformity — jarak di LAB
+   space sesuai dengan perbedaan yang dirasakan mata manusia. Channel L
+   memisahkan lightness secara bersih dari A dan B yang mengkode warna, jadi
+   kita bisa enhance brightness tanpa menyentuh warna sama sekali.
+
+Q7: Kenapa PSNR CLAHE lebih rendah dari GHE tapi CLAHE disebut lebih baik?
+A: PSNR mengukur Mean Squared Error pixel-wise terhadap ground truth. GHE
+   unggul PSNR karena transformasi globalnya secara rata-rata menghasilkan
+   output yang lebih dekat ke ground truth secara pixel-wise.
+   Tapi SSIM mengukur structural similarity — preservasi tepi, tekstur, dan
+   kontras lokal — yang lebih berkorelasi dengan persepsi visual manusia.
+   CLAHE mempertahankan struktur lokal per tile lebih baik dari GHE. Itu
+   alasan kita prioritaskan SSIM sebagai metrik utama, bukan PSNR.
+
+Q8: Apa itu clip limit dan apa dampaknya kalau terlalu tinggi atau terlalu rendah?
+A: Clip limit adalah batas maksimal tinggi histogram di setiap tile sebelum
+   redistribusi. Kalau clip limit terlalu rendah (misal 1.0): enhancement
+   minimal, gambar hampir tidak berubah. Kalau terlalu tinggi: redistribusi
+   agresif, noise di area flat ter-amplify, hasil terlihat "grainy".
+   Optimal di dataset kami: 4.0 — cukup agresif untuk enhance tapi tidak
+   over-amplify noise.
+
+Q9: Kenapa tile size 4×4 terbaik? Bukan 8×8 atau 16×16?
+A: Semakin kecil tile, semakin lokal konteks yang dipertimbangkan —
+   enhancement lebih adaptif per region kecil. Tile 4×4 memberikan
+   adaptivity tertinggi. Tile 16×16 lebih "global" dan hasilnya mendekati
+   GHE. Dari grid search, tile 4×4 konsisten menghasilkan SSIM tertinggi
+   di semua level clip limit.
+
+Q10: Kenapa hanya pakai GHE dan CLAHE? Tidak coba metode lain seperti
+     Retinex, Gamma Correction, atau MSRCR?
+A: GHE dan CLAHE dipilih karena:
+   (1) Keduanya berbasis histogram — relevan langsung dengan topik "Histogram
+       Equalization" yang jadi judul project ini
+   (2) GHE adalah metode klasik paling foundational — wajib ada sebagai baseline
+   (3) CLAHE adalah improvement langsung dari GHE yang mengatasi limitasi
+       utamanya (noise amplification, local context)
+   (4) Keduanya deterministic, interpretable, dan tidak butuh training data
+       untuk enhancement-nya sendiri
+   Metode lain seperti:
+   - Gamma Correction: hanya rescale brightness globally, tidak adaptive,
+     tidak equalize distribusi — terlalu sederhana
+   - Retinex/MSRCR: kompleksitas jauh lebih tinggi, butuh multi-scale
+     processing, lebih ke arah HDR tone mapping
+   - Deep learning (RetinexNet, Zero-DCE): butuh GPU dan ratusan ribu
+     parameter — out of scope untuk classical CV project
+   Scope kami adalah optimize histogram-based approach dengan ML, bukan
+   compare semua metode enhancement yang ada.
+
+Q11: Ada tidak kasus di mana GHE lebih baik dari CLAHE?
+A: Ada. Untuk gambar yang sudah memiliki kontras global yang sangat rendah
+   secara merata (uniform underexposure tanpa variasi lokal), GHE bisa
+   lebih baik karena tidak terfragmentasi per tile. GHE juga unggul PSNR
+   rata-rata di dataset kami (15.33 vs 10.54). Oleh karena itu kami tetap
+   tampilkan keduanya di app dan biarkan user memilih, plus sistem auto-pick
+   Best Result berdasarkan SSIM atau heuristic score.
+
+Q11: Bagaimana sistem handle foto yang sudah normal exposure?
+A: ML Classifier mendeteksi label "normal". Sistem menampilkan warning bahwa
+   enhancement akan minimal dan hasil mungkin mirip aslinya. User tetap bisa
+   jalankan GHE dan CLAHE, tapi diberi tahu supaya tidak mengharapkan
+   perubahan besar. Ini penting untuk honesty terhadap user.
+
+
+====================================================
+SECTION 3 — MACHINE LEARNING
+====================================================
+
+Q12: Kenapa pakai Random Forest? Kenapa tidak SVM, KNN, atau deep learning?
+A: Random Forest dipilih karena:
+   (1) Naturally handles non-linear boundaries antar kelas
+   (2) Robust terhadap outlier dan tidak butuh feature scaling
+   (3) Built-in feature importance — kita tahu fitur mana yang paling berkontribusi
+   (4) Tidak butuh GPU, training cepat (<1 detik untuk 1156 sampel)
+   (5) Ensemble dari 100 trees mengurangi variance dibanding single decision tree
+   SVM butuh kernel tuning dan scaling. KNN lambat di inference. Deep learning
+   overkill untuk 10 fitur tabular.
+
+Q13: 10 fitur itu dari mana asalnya? Kenapa 10?
+A: Fitur diambil dari distribusi statistik histogram L channel:
+   mean, std, skewness, kurtosis (4 fitur statistik dasar),
+   p10, p25, p75, p90 (4 persentil untuk shape histogram),
+   contrast ratio = p90−p10 (tonal range),
+   entropy (information content).
+   Jumlah 10 bukan angka ajaib — ini set fitur yang lazim dipakai di
+   literatur image quality assessment dan terbukti diskriminatif untuk
+   membedakan exposure kondisi tanpa perlu CNN atau deep feature.
+
+Q14: Kenapa accuracy cross-validation bisa sampai 96.28%? Apakah overfitting?
+A: Tanda-tanda overfitting: akurasi training jauh lebih tinggi dari validation.
+   Di 5-fold CV, kita tidak punya "training accuracy" terpisah — setiap fold
+   dipakai sebagai validation sekali. Std 1.61% kecil artinya performa
+   konsisten di semua fold. Itu indikasi kuat model generalize dengan baik,
+   bukan overfit. Underexposed dan overexposed memang sangat berbeda secara
+   distribusi histogram — kelas ini mudah dipisahkan, jadi 96% realistis.
+
+Q15: Bagaimana Predictor bisa MAE 0.0837? Itu tidak terlalu bagus ya untuk
+     sesuatu yang range-nya 1.0–4.0?
+A: Justru sangat bagus. Range clip limit di grid search adalah 1.0, 2.0, 3.0,
+   4.0 — step 1.0. MAE 0.0837 artinya prediksi rata-rata meleset kurang dari
+   0.1 dari nilai optimal. Secara praktis: kalau optimal 4.0, prediksi bisa
+   3.91–4.09. Setelah snapping ke nearest 0.5, error hampir selalu 0.
+   Tile accuracy 99.59% artinya dari 485 gambar, hanya ~2 gambar yang tile
+   size-nya salah prediksi.
+
+Q16: Kenapa ada dua model untuk Predictor (Regressor + Classifier) bukan satu?
+A: clip_limit adalah nilai kontinu (1.0, 1.5, 2.0, dst) — lebih cocok
+   diprediksi dengan Regressor. tile_size adalah nilai diskrit kategorik
+   (4, 8, atau 16) — ini naturally classification problem. Menggabungkan
+   keduanya dalam satu model multi-output bisa dilakukan tapi lebih kompleks
+   dan tidak ada benefit signifikan. Dua model terpisah lebih clean.
+
+Q17: Feature importance dari classifier, fitur mana yang paling penting?
+A: Dari visualisasi di experiments/plots/, fitur paling diskriminatif untuk
+   exposure classification adalah mean brightness, p90 (highlight percentile),
+   dan p10 (shadow percentile). Ini masuk akal: gambar underexposed punya
+   mean rendah dan p90 rendah; overexposed punya mean tinggi dan p90 mendekati
+   255. Skewness dan entropy memberikan informasi tambahan tapi kontribusinya
+   lebih kecil.
+
+
+====================================================
+SECTION 4 — METRIK EVALUASI
+====================================================
+
+Q18: Apa itu SSIM dan kenapa lebih dipilih dari PSNR?
+A: SSIM (Structural Similarity Index) mengukur kemiripan dua gambar dari tiga
+   aspek: luminance, contrast, dan structure. Range 0–1, makin tinggi makin
+   mirip. PSNR mengukur rasio sinyal terhadap noise berbasis MSE — murni
+   pixel-wise. PSNR tidak memperhitungkan apakah struktur dan tepi gambar
+   terjaga. Dua gambar bisa PSNR sama tapi SSIM sangat berbeda kalau satu
+   blur merata dan satu sharp tapi ada noise. Untuk evaluasi visual quality,
+   SSIM lebih berkorelasi dengan persepsi manusia.
+
+Q19: Apa itu Histogram Uniformity dan Entropy? Kenapa perlu no-reference metrics?
+A: No-reference metrics diperlukan karena user real tidak selalu punya ground
+   truth (foto original-nya). Kita tetap ingin beri feedback kuantitatif.
+   Histogram Uniformity mengukur seberapa merata distribusi intensitas — nilai
+   tinggi artinya histogram lebih flat, kontras lebih baik.
+   Entropy mengukur information content dari distribusi — nilai tinggi artinya
+   lebih banyak variasi intensitas, detail lebih kaya.
+   Keduanya dihitung dari output saja tanpa perlu referensi.
+
+Q20: SSIM 0.4519 itu bagus atau tidak?
+A: Untuk metode klasik histogram-based di LOL dataset, 0.4519 itu kompetitif.
+   Literatur menunjukkan rentang 0.40–0.50 untuk metode classical. Deep learning
+   state-of-the-art (RetinexNet, EnlightenGAN) mencapai 0.55–0.75. Jadi kita
+   di ujung atas range classical, tapi masih ada gap ke DL. Kami tidak klaim
+   mengalahkan DL — scope-nya memang classical CV dengan ML ringan.
+
+
+====================================================
+SECTION 5 — APLIKASI & IMPLEMENTASI
+====================================================
+
+Q21: Kenapa pakai Streamlit? Bukan Flask atau FastAPI?
+A: Streamlit dirancang untuk data science dan ML demo — tidak perlu tulis
+   HTML/CSS/JS sama sekali. UI interaktif (slider, upload, columns) bisa
+   dibuat dalam puluhan baris Python. Flask/FastAPI lebih cocok untuk API
+   production, bukan interactive demo. Untuk scope presentasi akademik,
+   Streamlit adalah pilihan paling efisien.
+
+Q22: Apakah app bisa diakses online? Sudah di-deploy?
+A: Saat ini berjalan di localhost. Untuk deploy ke Streamlit Cloud butuh
+   push ke GitHub public repo dan ganti opencv-python ke
+   opencv-python-headless di requirements.txt (versi headless tidak butuh
+   GUI dependencies yang tidak tersedia di server Linux). Ini adalah
+   remaining task sebelum final submission.
+
+Q23: Bagaimana sistem memilih "Best Result" antara GHE dan CLAHE?
+A: Dua kondisi:
+   (1) Jika user upload ground truth: pilih output dengan SSIM tertinggi.
+       Ini objective dan langsung dari metrik.
+   (2) Jika tidak ada ground truth: hitung composite heuristic score:
+       Score = 0.30×Entropy + 0.20×Brightness×10 + 0.15×Contrast×10 + 0.35×NoiseScore×10
+       NoiseScore = 1/(1 + Laplacian_variance/800) — penalti noise tinggi.
+       Kalau GHE unggul tapi margin < 15%, tetap pilih CLAHE karena
+       CLAHE inherently lebih noise-controlled.
+
+Q24: Kenapa ada mode Manual selain Auto ML?
+A: Dua alasan. Pertama, user mungkin punya preferensi estetik berbeda dari
+   apa yang ML rekomendasikan — kontrol tetap di tangan user. Kedua, untuk
+   debugging dan eksplorasi: researcher bisa manually sweep parameter dan
+   lihat efeknya real-time. Auto ML adalah convenience, bukan mandatory.
+
+Q25: Bagaimana kalau user upload gambar yang bukan foto (misal diagram, screenshot)?
+A: Sistem tetap jalan — tidak ada validasi tipe konten gambar. ML Classifier
+   akan klasifikasi berdasarkan distribusi histogram L channel apapun yang
+   diupload. Hasilnya mungkin tidak meaningful secara visual. Ini memang
+   limitasi — sistem didesain untuk foto natural, bukan arbitrary images.
+
+
+====================================================
+SECTION 6 — KONSEPTUAL & TEORI
+====================================================
+
+Q26: Apa perbedaan fundamental GHE dan CLAHE dalam satu kalimat?
+A: GHE equalize satu histogram untuk seluruh gambar; CLAHE equalize histogram
+   terpisah untuk setiap tile lokal dengan batas amplification.
+
+Q27: Apa yang dimaksud "clip" di CLAHE? Clip apa yang di-clip?
+A: Yang di-clip adalah tinggi bar histogram per tile. Kalau bar histogram
+   di suatu bin melebihi clip limit, pixel yang "overflow" di atas batas itu
+   didistribusikan merata ke semua bin — bukan dibuang. Ini yang mencegah
+   single intensity value ter-amplify terlalu agresif dan menghasilkan noise.
+
+Q28: Kenapa pakai CDF untuk GHE bukan normalisasi biasa?
+A: CDF (Cumulative Distribution Function) memastikan output terdistribusi
+   uniform di seluruh range [0, L-1]. Normalisasi biasa hanya rescale range,
+   tidak mengubah distribusi. GHE ingin distribusi output flat (uniform) —
+   itu dicapai dengan mapping melalui CDF input, bukan sekadar stretching.
+
+Q29: Apa hubungan antara histogram yang flat dan kontras yang baik?
+A: Histogram flat artinya semua level intensitas terwakili secara merata.
+   Ini berarti tidak ada "penumpukan" di area gelap (underexposed) atau
+   area terang (overexposed). Gambar dengan histogram flat memanfaatkan
+   full dynamic range sensor, yang secara visual menghasilkan kontras
+   yang lebih kaya dan detail lebih visible di shadow maupun highlight.
+
+Q30: Kenapa skewness dan kurtosis histogram bisa membedakan exposure?
+A: Gambar underexposed: histogram skewed ke kanan (intensitas rendah dominan)
+   — skewness positif tinggi. Gambar overexposed: histogram skewed ke kiri
+   (intensitas tinggi dominan) — skewness negatif. Gambar normal: distribusi
+   lebih simetris, skewness mendekati 0. Kurtosis mengukur "keruncingan" peak
+   histogram — gambar low-contrast punya kurtosis tinggi (semua pixel
+   berkumpul di range sempit). Kombinasi keduanya sangat diskriminatif
+   untuk exposure classification tanpa perlu lihat konten gambar.
+
+Q31: Apa itu CIELAB dan mengapa "perceptually uniform"?
+A: CIELAB (L*a*b*) adalah color space yang dirancang agar jarak Euclidean
+   antar dua titik di ruang itu berkorelasi dengan perbedaan warna yang
+   dirasakan manusia. Di RGB, delta yang sama di channel R vs channel G
+   menghasilkan perbedaan visual yang tidak sama. Di LAB, delta 10 unit
+   di mana pun di ruang itu terasa "sama besar" secara persepsi. Ini
+   penting untuk enhancement yang hasilnya natural di mata manusia.
+
+====================================================
+TIPS JAWABAN
+====================================================
+- Limitasi: akui dengan percaya diri, jangan defensif. Semua sistem punya limitasi.
+- Angka bagus (96.28%, MAE 0.08, 99.59%): sebutkan dengan yakin.
+- Kalau tidak tahu: "Itu pertanyaan menarik, kami belum explore ke arah itu.
+  Tapi berdasarkan yang kami ketahui, kemungkinannya adalah..."
+- Jangan bluffing — dosen CV biasanya tahu detail teknis.
+====================================================

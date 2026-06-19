@@ -1,0 +1,28 @@
+# =====================================================
+# Computer Vision AOL — Automated Contrast Correction
+# requirements.txt
+# Python 3.10+
+# =====================================================
+
+# Core image processing
+opencv-python-headless==4.9.0.80   # headless — compatible with Streamlit Cloud
+numpy==1.26.4
+Pillow==10.3.0
+
+# Evaluation metrics
+scikit-image==0.23.2
+
+# Visualization
+matplotlib==3.8.4
+
+# Web app
+streamlit==1.35.0
+
+# ML lightweight (Auto Exposure Classifier + Auto Parameter Predictor)
+scikit-learn==1.4.2                # Random Forest, SVM, KNN — no GPU needed
+scipy==1.13.0                      # histogram feature extraction (skewness, kurtosis)
+pandas==2.2.2                      # experiment result logging to CSV
+joblib==1.4.2                      # save/load trained ML models (.pkl)
+
+# Utilities
+tqdm==4.66.4                       # progress bar for batch processing

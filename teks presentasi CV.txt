@@ -1,0 +1,342 @@
+====================================================
+TEKS PRESENTASI — Computer Vision Final Project (AOL)
+COMP7116001 – Computer Vision | Team 2 | Binus University
+Gunakan sebagai panduan, bukan dibaca kata per kata
+====================================================
+
+
+----------------------------------------------------
+SLIDE 1 — COVER
+----------------------------------------------------
+
+Selamat [pagi/siang/sore], Pak Fiqri dan teman-teman sekalian.
+
+Kami dari Team 2 mata kuliah Computer Vision, COMP7116001, Binus University.
+
+Project kami berjudul "Automated Contrast Correction System for Under-Exposed
+and Over-Exposed Photography Using Optimized Histogram Equalization."
+
+Anggota tim kami enam orang: Ahmad Daffa, Andrey, Ezra, Jason, Keanu, dan Rafifdiya.
+
+Langsung kita mulai.
+
+[Estimasi: ~30 detik]
+
+
+----------------------------------------------------
+SLIDE 2 — PROBLEM STATEMENT
+----------------------------------------------------
+
+Kita mulai dari masalahnya.
+
+Dalam dunia fotografi dan imaging, ada dua masalah pencahayaan yang sangat umum terjadi.
+
+Yang pertama: foto underexposed — terlalu gelap karena kurang cahaya yang masuk
+ke sensor. Detail di area shadow hilang, objek susah dibedakan.
+
+Yang kedua: foto overexposed — terlalu terang karena kelebihan cahaya.
+Area highlight blown out, warna jadi pucat, tekstur hilang.
+
+Solusi klasiknya adalah Histogram Equalization. Teknik ini sudah ada puluhan
+tahun dan memang efektif. Tapi masalahnya: parameter harus di-tune secara manual
+untuk setiap gambar. Tidak ada yang otomatis mendeteksi kondisi exposure gambar,
+lalu menyesuaikan parameternya sendiri.
+
+Nah, itulah gap yang kami coba isi.
+
+[Estimasi: ~1 menit]
+
+
+----------------------------------------------------
+SLIDE 3 — OBJEKTIF & DATASET
+----------------------------------------------------
+
+Dari masalah tadi, kami menetapkan tiga tujuan utama.
+
+Satu: Bangun pipeline koreksi kontras otomatis menggunakan dua metode — GHE dan
+CLAHE. GHE sebagai baseline, CLAHE sebagai metode utama.
+
+Dua: Latih ML Classifier yang bisa mendeteksi kondisi exposure gambar secara
+otomatis — apakah underexposed, overexposed, atau normal.
+
+Tiga: Latih ML Predictor yang memilih parameter CLAHE optimal untuk tiap gambar
+tanpa input manual dari user.
+
+Untuk data, kami pakai dua dataset.
+
+LOL Dataset dari Wei et al. 2018 — berisi 485 pasang gambar training dan 15 pasang
+test. Setiap pasang terdiri dari foto low-light dan ground truth-nya yang
+normal-light. Dataset ini jadi basis utama untuk eksperimen GHE vs CLAHE dan
+training ML Predictor.
+
+SICE Part2 — Single Image Contrast Enhancement Dataset — kami gunakan khusus untuk
+melengkapi kelas overexposed pada ML Classifier. Kami ambil 186 gambar dengan
+brightness tertinggi dari dataset ini sebagai real overexposed samples.
+
+Sedikit cerita: awalnya kami tidak punya data overexposed sama sekali karena LOL
+hanya menyediakan low dan normal. Solusi pertama kami adalah men-generate data
+overexposed secara synthesized — foto normal dari LOL kami brighten paksa pakai
+gamma correction. Hasilnya classifier akurasi 86.74%. Setelah kami ganti ke real
+overexposed photo dari SICE, akurasi naik jadi 96.28% — bukti bahwa real data
+jauh lebih baik dari data buatan.
+
+[Estimasi: ~1 menit]
+
+
+----------------------------------------------------
+SLIDE 4 — METODE CV: GHE & CLAHE
+----------------------------------------------------
+
+Sekarang kita masuk ke metode Computer Vision-nya.
+
+GHE atau Global Histogram Equalization bekerja dengan meratakan distribusi
+intensitas piksel secara global di seluruh gambar. Formulanya: s sama dengan
+L minus 1 dikali CDF dari r — intinya intensitas piksel di-remap mengikuti
+CDF histogramnya. GHE cepat, mudah diimplementasi, dan kami pakai sebagai baseline.
+
+Tapi GHE punya kelemahan: karena prosesnya global, ia tidak peduli konteks lokal.
+Area yang sudah cukup terang bisa tetap ter-enhance secara agresif, menghasilkan
+noise amplification dan warna yang terlihat tidak natural.
+
+CLAHE — Contrast Limited Adaptive Histogram Equalization — mengatasi masalah ini
+dengan dua cara.
+
+Pertama: adaptive — gambar dibagi ke dalam grid tile kecil, equalization dilakukan
+per tile, bukan per gambar. Jadi konteks lokal dipertahankan.
+
+Kedua: contrast limited — ada parameter clip limit yang membatasi redistribusi
+histogram. Kalau histogram tile melewati batas ini, pixel yang "overflow"
+didistribusikan merata ke seluruh range, bukan hanya di puncak. Ini yang mencegah
+noise over-amplification.
+
+Ada dua parameter yang perlu diatur: clip limit dan tile size.
+Di sinilah ML Predictor kami berperan.
+
+[Estimasi: ~1 menit 15 detik]
+
+
+----------------------------------------------------
+SLIDE 5 — PIPELINE SISTEM
+----------------------------------------------------
+
+Ini gambaran alur sistem kami secara keseluruhan.
+
+Dimulai dari input foto — bisa upload file atau langsung dari kamera browser.
+
+Sistem lalu mengekstrak 10 fitur dari histogram channel L. Kami bekerja di color
+space LAB, bukan RGB langsung — alasannya supaya koreksi hanya menyentuh
+brightness, bukan warna. Channel A dan B yang mengkode warna tidak pernah
+diubah sepanjang proses.
+
+Sepuluh fitur itu mencakup mean, standar deviasi, skewness, kurtosis, empat
+persentil (p10, p25, p75, p90), contrast ratio, dan entropy.
+
+Fitur tersebut masuk ke ML Classifier — hasilnya: underexposed, overexposed,
+atau normal.
+
+Lalu ke ML Predictor yang memberikan rekomendasi clip limit dan tile size optimal.
+
+Dengan parameter itu, kami jalankan CLAHE dan juga GHE sebagai pembanding —
+keduanya di channel L.
+
+Terakhir, output ditampilkan beserta metrik evaluasi. Kalau user punya ground
+truth, tampil PSNR dan SSIM. Kalau tidak, tetap ada no-reference metrics:
+Histogram Uniformity dan Entropy.
+
+User juga bisa switch ke Mode Manual dan override parameter lewat slider kapan saja.
+
+[Estimasi: ~1 menit 30 detik]
+
+
+----------------------------------------------------
+SLIDE 6 — HASIL EKSPERIMEN
+----------------------------------------------------
+
+Kami jalankan grid search dengan kombinasi clip limit 1.0 sampai 4.0 dan tile
+size 4x4, 8x8, dan 16x16 — total 12 kombinasi — pada 485 gambar training.
+
+Hasilnya ada di tabel ini.
+
+GHE baseline punya PSNR 15.33 dB dan SSIM 0.4431.
+
+Kombinasi CLAHE terbaik ada di clip=4.0 tile=4x4 — SSIM 0.4519, mengalahkan GHE.
+
+Memang PSNR CLAHE lebih rendah dari GHE. Tapi kami pilih SSIM sebagai metrik
+utama karena SSIM mengukur structural similarity — lebih relevan untuk kualitas
+visual dari perspektif manusia. PSNR hanya mengukur pixel-wise error, yang tidak
+selalu berkorelasi dengan seberapa bagus gambar terlihat. CLAHE mempertahankan
+struktur lokal lebih baik, meski secara pixel-wise lebih jauh dari ground truth.
+
+Jadi parameter final kami: clip=4.0, tile=4x4.
+
+[Estimasi: ~1 menit 15 detik]
+
+
+----------------------------------------------------
+SLIDE 7 — MACHINE LEARNING COMPONENT
+----------------------------------------------------
+
+Sekarang ke komponen Machine Learning kami.
+
+Pertama: Auto Exposure Classifier.
+
+Model ini pakai Random Forest dengan 100 trees. Input-nya 10 fitur histogram
+channel L tadi. Output-nya label exposure: underexposed, overexposed, atau normal.
+
+Data training: 485 gambar underexposed dari LOL, 485 gambar normal dari LOL,
+ditambah 186 gambar overexposed asli dari dataset SICE Part2 — bukan gambar buatan.
+Kami pilih gambar dengan mean brightness L channel di atas 155.
+
+Akurasi 5-fold cross-validation: 96.28% plus minus 1.61% — jauh di atas target 85%.
+
+Kedua: Auto Parameter Predictor.
+
+Juga pakai Random Forest — tapi dua model terpisah: Regressor untuk prediksi
+clip limit, Classifier untuk tile size. Input sama: 10 fitur histogram.
+
+Label training-nya diambil dari hasil grid search tadi — untuk tiap gambar, kami
+rekam kombinasi clip+tile yang menghasilkan SSIM tertinggi. Itu yang jadi target.
+
+Hasilnya: MAE clip limit = 0.0837 — sangat kecil, artinya prediksi jarang meleset
+lebih dari 0.1 dari nilai optimal. Akurasi tile size = 99.59%.
+
+Kedua model disave sebagai file .pkl dan langsung diload oleh aplikasi Streamlit.
+
+[Estimasi: ~1 menit 30 detik]
+
+
+----------------------------------------------------
+SLIDE 8 — OUTPUT DEMO SNAPSHOT
+----------------------------------------------------
+
+Ini tampilan dari web app kami.
+
+Ketika user upload foto, sistem langsung menampilkan label exposure dari ML —
+misalnya "ML detected: UNDEREXPOSED | Auto CLAHE params: clip=4.0, tile=4x4".
+
+Kemudian ditampilkan tiga gambar side-by-side: foto asli, hasil GHE, dan hasil
+CLAHE — masing-masing dengan tombol download langsung di bawahnya.
+
+Untuk metrik evaluasi, ada dua jenis.
+
+Kalau user juga upload ground truth, tampil PSNR dan SSIM dengan referensi —
+angka yang tertera di slide ini adalah dari satu sample gambar spesifik,
+bukan rata-rata keseluruhan.
+
+Kalau user tidak punya ground truth, tetap ada No-Reference Metrics: Histogram
+Uniformity dan Entropy. Tabel di slide ini menunjukkan bahwa CLAHE meningkatkan
+Uniformity dari 0.36 ke 0.53, dan Entropy dari 5.50 ke 6.72 — artinya distribusi
+intensitas lebih merata dan informasi gambar lebih kaya.
+
+Sistem juga otomatis pilih Best Result antara GHE dan CLAHE, dan kasih tombol
+download langsung.
+
+[Jika ada live demo: "Sekarang kami tunjukkan langsung."]
+
+[Estimasi: ~1 menit 30 detik]
+
+
+----------------------------------------------------
+SLIDE 9 — KESIMPULAN
+----------------------------------------------------
+
+Baik, kesimpulan dari project ini.
+
+Yang berhasil kami capai:
+
+Pipeline GHE dan CLAHE berhasil melakukan koreksi kontras secara otomatis.
+Parameter terbaik yang kami temukan: CLAHE clip 4.0 tile 4x4 dengan rata-rata
+SSIM 0.4519 di 485 gambar training — mengalahkan GHE baseline.
+
+ML Classifier mencapai akurasi 96.28% untuk deteksi exposure otomatis.
+ML Predictor dengan MAE 0.08 bisa memilih parameter tanpa tuning manual sama sekali.
+
+Web app Streamlit sudah berjalan lengkap: upload, kamera, Auto/Manual mode,
+download hasil, dan evaluasi metrics.
+
+Limitasi yang kami kenali:
+
+Pertama, class imbalance — data overexposed kami dari SICE hanya 186 sampel,
+sementara kelas lain masing-masing 485. Distribusi training belum seimbang.
+
+Kedua, gap ke deep learning — SSIM kami 0.4519 masih di bawah metode deep learning
+state-of-the-art seperti RetinexNet yang bisa mencapai 0.55–0.75.
+
+Ketiga, sistem baru divalidasi pada distribusi LOL yang dominan indoor low-light —
+belum diuji di kondisi real-world yang lebih beragam.
+
+Future work: Deep learning approach, dataset overexposed lebih besar dan seimbang,
+serta dukungan untuk video real-time.
+
+[Estimasi: ~1 menit 15 detik]
+
+
+----------------------------------------------------
+SLIDE 10 — THANK YOU / DEMO
+----------------------------------------------------
+
+Sekian presentasi dari kami Team 2.
+
+Jika ingin melihat source code, ada di GitHub kami. Demo app juga bisa dijalankan
+lokal dengan:
+
+    python -m streamlit run app.py
+
+Terima kasih atas perhatiannya. Kami terbuka untuk pertanyaan.
+
+[Estimasi: ~20 detik]
+
+
+====================================================
+RINGKASAN DURASI
+====================================================
+Slide 1  — Cover              :  ~0:30
+Slide 2  — Problem Statement  :  ~1:00
+Slide 3  — Objektif & Dataset :  ~1:00
+Slide 4  — Metode GHE & CLAHE :  ~1:15
+Slide 5  — Pipeline Sistem    :  ~1:30
+Slide 6  — Hasil Eksperimen   :  ~1:15
+Slide 7  — ML Component       :  ~1:30
+Slide 8  — Demo Snapshot      :  ~1:30
+Slide 9  — Kesimpulan         :  ~1:15
+Slide 10 — Penutup            :  ~0:20
+--------------------------------------------
+TOTAL                         :  ~11:05 menit
+====================================================
+
+
+====================================================
+ANTISIPASI PERTANYAAN DOSEN
+====================================================
+
+Q: Kenapa PSNR CLAHE lebih rendah dari GHE kalau CLAHE disebut lebih baik?
+A: PSNR mengukur pixel-wise error terhadap ground truth. GHE unggul PSNR karena
+   output-nya secara global lebih mendekati rata-rata ground truth. Tapi SSIM
+   mengukur structural similarity — preservasi tepi, tekstur, dan kontras lokal
+   — yang lebih relevan untuk persepsi visual manusia. CLAHE mempertahankan
+   struktur lokal lebih baik meski pixel-wise lebih jauh.
+
+Q: Kenapa pakai Random Forest, bukan deep learning?
+A: Scope project ini adalah classical CV + lightweight ML yang bisa jalan tanpa GPU.
+   Random Forest cukup dengan 10 fitur statistik, training cepat, interpretable
+   (feature importance bisa dilihat), dan hasilnya sudah bagus: 96.28% dan MAE 0.0837.
+   Deep learning akan jadi future work.
+
+Q: Kenapa SSIM target 0.80 tidak tercapai?
+A: Target 0.80 adalah aspirasi awal. Metode klasik histogram-based memang secara
+   umum mencapai 0.40-0.50 di LOL dataset — ini konsisten dengan literatur.
+   Deep learning state-of-the-art baru bisa tembus 0.55-0.75. Kami sudah melebihi
+   GHE baseline (0.4431) dengan CLAHE (0.4519).
+
+Q: Class imbalance 186 vs 485 — kenapa tidak di-augment atau oversample?
+A: Ini memang limitasi yang kami akui. Ke depan bisa pakai SMOTE atau collect lebih
+   banyak data overexposed asli. Tapi meski imbalance, akurasi 96.28% dengan std
+   1.61% di cross-validation menunjukkan model tetap perform baik.
+
+Q: Kenapa tidak pakai HSV daripada LAB?
+A: LAB dirancang untuk perceptual uniformity — jarak di LAB space lebih sesuai dengan
+   perbedaan yang dirasakan manusia. Channel L di LAB memisahkan lightness secara
+   lebih bersih dari hue dan saturation dibanding channel V di HSV, yang membuatnya
+   lebih tepat untuk enhancement berbasis luminance.
+
+====================================================

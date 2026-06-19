@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+.venv/
+env/
+ENV/
+
+# Dataset (terlalu besar untuk GitHub)
+dataset/
+
+# Folder sampah / non-project
+teswok/
+Hasil_contoh_paper/
+HOW TO RUN THE FILE/
+proposal paper/
+requirement final project/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# Temporary
+*.tmp
+*.bak
+
+# Internal progress tracking
+PROGRESS.md
+
+# Claude Code
+CLAUDE.md
+.claude/

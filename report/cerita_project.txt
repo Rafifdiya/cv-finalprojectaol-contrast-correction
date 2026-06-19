@@ -1,0 +1,378 @@
+====================================================================
+  CERITA PROJECT: Automated Contrast Correction
+  COMP7116001 — Computer Vision | Team 2 | Binus University
+====================================================================
+
+Semuanya bermula dari sebuah pertanyaan sederhana:
+"Gimana caranya komputer bisa otomatis benerin foto yang terlalu gelap
+atau terlalu terang, tanpa harus diatur manual?"
+
+Itulah inti dari project ini.
+
+--------------------------------------------------------------------
+  BABAK 1 — MASALAH YANG MAU DIPECAHIN
+--------------------------------------------------------------------
+
+Kita semua pernah ngalamin: foto yang diambil malem-malem hasilnya
+gelap banget, detail-detailnya ilang ketelen bayangan. Atau foto di
+siang hari terik, langitnya jadi putih polos, muka orang jadi silau.
+
+Kondisi ini disebut "improperly exposed" — gambar yang kontrasnya
+ga ideal karena pencahayaan yang kurang atau berlebih.
+
+Solusi klasiknya namanya Histogram Equalization. Idenya simpel:
+ambil semua nilai kecerahan pixel dalam gambar (0 = hitam, 255 = putih),
+lalu sebar ulang distribusinya supaya lebih merata di seluruh rentang.
+Hasilnya? Kontras gambar meningkat.
+
+Tapi solusi klasik ini punya masalah besar:
+
+1. GHE (Global Histogram Equalization) — cara paling basic.
+   Dia equalize seluruh gambar sekaligus secara global.
+   Problemnya: noise di area gelap ikut diangkat. Hasilnya gambar
+   jadi "grainy" atau berbintik-bintik, kontrasnya malah keliatan
+   kasar dan ga natural.
+
+2. Tidak ada "awareness" — GHE ga tau apakah foto yang dia terima
+   itu gelap, terang, atau sudah pas. Dia proses semua foto sama.
+
+3. Manual tuning — ada method yang lebih canggih (CLAHE), tapi
+   butuh parameter yang diatur manual. Orang awam ga bakal tau
+   harus set berapa.
+
+Nah, project kita mau solve ketiga masalah itu sekaligus.
+
+--------------------------------------------------------------------
+  BABAK 2 — KENALAN SAMA DUA JAGOAN KITA: GHE vs CLAHE
+--------------------------------------------------------------------
+
+Kita punya dua method utama yang kita bandingin.
+
+GHE (Global Histogram Equalization)
+------------------------------------
+Bayangin kamu punya segepok uang koin berbeda nominal, dan kamu mau
+sebar mereka rata di atas meja. GHE itu kayak gitu — dia lihat semua
+pixel di seluruh gambar, hitung distribusinya, lalu remap semuanya
+supaya tersebar merata dari 0 sampai 255.
+
+Simpel, cepat, tapi brutal. Dia ga peduli apakah ada bagian gambar
+yang sebenernya udah bagus kontrasnya. Semua diratain paksa.
+Akibatnya area yang gelap memang jadi lebih terang, tapi noise
+(bintik-bintik) di area itu ikut keangkat juga. Itulah kenapa
+hasil GHE kadang keliatan kasar atau "washed out".
+
+CLAHE (Contrast Limited Adaptive Histogram Equalization)
+---------------------------------------------------------
+Ini versi yang lebih cerdas. CLAHE bagi-bagi gambar jadi kotak-kotak
+kecil (tile), terus equalize masing-masing tile secara lokal.
+Hasilnya jauh lebih natural karena dia adapt sama kondisi lokal
+tiap bagian gambar.
+
+Yang lebih penting, CLAHE punya "clip limit" — batas maksimal
+seberapa agresif dia boleh angkat kontras. Kalau ada noise di area
+gelap, clip limit ini yang cegah noise itu dari diangkat terlalu
+tinggi. Makanya hasil CLAHE biasanya lebih bersih dari GHE.
+
+Tapi CLAHE punya dua parameter yang harus disetting:
+- Clip Limit: seberapa agresif peningkatan kontrasnya (1.0 – 8.0)
+- Tile Size: ukuran kotak-kotak lokalnya (4×4, 8×8, atau 16×16)
+
+Pilih yang salah, hasilnya bisa kurang maksimal atau malah muncul
+artefak kotak-kotak di gambar.
+
+--------------------------------------------------------------------
+  BABAK 3 — FONDASI TEKNIS: LAB COLOR SPACE
+--------------------------------------------------------------------
+
+Sebelum apply GHE atau CLAHE, kita ga langsung kerja di gambar RGB
+biasa. Ada langkah penting dulu.
+
+Bayangin gambar foto itu kayak campuran tiga bahan: warna merah (R),
+hijau (G), biru (B). Kalau kita langsung equalize semua tiga channel
+itu, warnanya bakal berubah jadi aneh — bisa kehijau-hijauan,
+kemerahan, atau pucat.
+
+Makanya kita convert dulu ke LAB color space:
+- L channel = Lightness (kecerahan)
+- A channel = green ↔ red
+- B channel = blue ↔ yellow
+
+Kita hanya sentuh L channel-nya aja. A dan B kita biarkan.
+Hasilnya? Kecerahan foto berubah tapi warna tetap natural.
+
+Pipeline lengkapnya:
+  Foto asli (BGR) → Convert ke LAB → Ambil L channel
+  → Apply GHE atau CLAHE hanya di L → Gabung lagi L+A+B
+  → Convert balik ke BGR → Foto hasil
+
+--------------------------------------------------------------------
+  BABAK 4 — MENCARI PARAMETER TERBAIK: GRID SEARCH
+--------------------------------------------------------------------
+
+Pertanyaan pertama yang harus dijawab: dari semua kombinasi parameter
+CLAHE, mana yang paling bagus?
+
+Kita lakukan "grid search" — coba semua kombinasi secara sistematis.
+Parameternya:
+  Clip Limit: 1.0, 2.0, 3.0, 4.0 (4 pilihan)
+  Tile Size:  4×4, 8×8, 16×16   (3 pilihan)
+  Total: 4 × 3 = 12 kombinasi
+
+Kita coba semua 12 kombinasi itu di 485 foto dari dataset LOL
+(Low-Light dataset — koleksi foto gelap beserta versi normalnya
+yang sudah dipasangkan).
+
+Untuk setiap foto dan setiap kombinasi parameter, kita hitung:
+- PSNR: seberapa dekat hasilnya secara pixel ke foto normalnya
+- SSIM: seberapa mirip strukturnya ke foto normalnya (lebih relevan
+  untuk penilaian kualitas visual manusia)
+
+Totalnya: 12 kombinasi × 485 foto = 5.820 eksperimen.
+
+Hasilnya jelas:
+  CLAHE clip=4.0, tile=4×4 → SSIM 0.4519 (terbaik!)
+  GHE baseline              → SSIM 0.4431
+
+CLAHE menang dari sisi kualitas visual (SSIM).
+Tapi ada temuan menarik: GHE justru unggul di PSNR (15.33 vs 10.54).
+Kenapa? Karena PSNR ngukur kedekatan pixel secara matematis —
+GHE yang agresif secara kebetulan menghasilkan nilai pixel yang
+lebih dekat ke ground truth secara rata-rata. Tapi SSIM yang ngukur
+struktur visual bilang CLAHE lebih bagus. Dan SSIM lebih relevan
+untuk penilaian kualitas foto oleh mata manusia.
+
+--------------------------------------------------------------------
+  BABAK 5 — MASUK MACHINE LEARNING: OTAK SI SISTEM
+--------------------------------------------------------------------
+
+Oke, kita udah tau parameter terbaik untuk CLAHE. Tapi masalahnya:
+gimana sistem bisa tau parameter mana yang harus dipake untuk
+foto yang baru, yang belum pernah dilihat sebelumnya?
+
+Di sinilah Machine Learning masuk. Kita bangun dua "otak" ML.
+
+OTAK 1: Exposure Classifier (Pendeteksi Kondisi Foto)
+------------------------------------------------------
+Tugasnya satu: lihat foto, putuskan apakah foto itu:
+- Underexposed (terlalu gelap)
+- Normal (sudah pas)
+- Overexposed (terlalu terang)
+
+Caranya: kita extract 10 angka dari histogram L channel setiap foto.
+Angka-angka ini kayak "sidik jari" kondisi pencahayaan foto itu.
+
+10 fitur tersebut adalah:
+  1. Mean        — rata-rata kecerahan
+  2. Std         — seberapa beragam kecerahannya
+  3. Skewness    — apakah distribusi condong gelap atau terang?
+  4. Kurtosis    — seberapa "runcing" puncak distribusinya?
+  5. P10         — 10% pixel paling gelap ada di mana?
+  6. P25         — batas kuartil bawah
+  7. P75         — batas kuartil atas
+  8. P90         — 10% pixel paling terang ada di mana?
+  9. Contrast    — jarak antara P90 dan P10
+  10. Entropy    — seberapa beragam informasi di histogramnya?
+
+Dengan 10 angka ini, kita train Random Forest Classifier.
+
+Tapi ada satu masalah: dataset LOL cuma punya foto gelap dan normal.
+Tidak ada foto overexposed sama sekali.
+
+Solusi pertama (versi awal): kita synthesize sendiri. Ambil 485 foto
+normal, lalu "paksa" jadi terang pakai gamma correction (γ=0.5) —
+rumus matematis yang bikin semua pixel jadi lebih cerah. Hasilnya
+foto "terang buatan", bukan foto yang memang overexposed dari kamera.
+Akurasi waktu itu: 86.74% — lumayan, tapi bisa lebih baik.
+
+Kenapa kurang optimal? Karena foto overexposed asli dari kamera punya
+karakteristik unik: highlight blown out, warna pucat di area tertentu,
+noise pattern yang berbeda. Foto gamma-corrected hanya "terang merata"
+— tidak merepresentasikan overexposed yang sesungguhnya.
+
+Solusi kedua (versi sekarang): kita upgrade ke data nyata dari SICE
+(Single Image Contrast Enhancement) dataset oleh Cai et al., IEEE TIP
+2018. SICE punya ratusan foto yang difoto langsung dengan exposure
+tinggi dari kamera asli. Kita pilih 186 foto paling terang dari sana.
+
+Datanya sekarang:
+  - 485 foto gelap (LOL train/low) → label: underexposed
+  - 485 foto normal (LOL train/normal) → label: normal
+  - 186 foto overexposed nyata (SICE Part2) → label: overexposed
+
+Total: 1.156 sampel training.
+Hasilnya setelah retrain: CV Accuracy 96.28% (target kita 85%) ✅
+Naik dari 86.74% → 96.28% hanya karena kualitas data overexposed-nya
+jauh lebih representatif.
+
+Ada satu tambahan: "hybrid rule-based fallback". Kalau classifier
+bilang "normal" tapi dengan confidence rendah, dan angka-angkanya
+menunjukkan foto sangat terang (P90 > 240, mean > 128),
+sistem override-nya jadi "overexposed". Ini buat handle kasus
+terang ekstrem yang mungkin kurang terwakili di data training.
+
+OTAK 2: Parameter Predictor (Pemilih Parameter Otomatis)
+--------------------------------------------------------
+Tugasnya: dari 10 fitur yang sama tadi, prediksi parameter CLAHE
+terbaik untuk foto itu.
+
+Dari hasil grid search (Babak 4), kita udah tau untuk setiap foto
+training, kombinasi mana yang menghasilkan SSIM tertinggi.
+Kita pakai info itu sebagai "label" untuk training.
+
+Dua model dilatih:
+  - RF Regressor → prediksi clip_limit (nilai float)
+    Hasilnya di-round ke 0.5 terdekat, clamp ke [1.0, 8.0]
+    Evaluasi: MAE = 0.0837 (sangat kecil!) ✅
+
+  - RF Classifier → prediksi tile_size (pilih dari 4, 8, atau 16)
+    Evaluasi: Accuracy = 99.59% (hampir sempurna!) ✅
+
+Kenapa tile size accuracy bisa setinggi itu? Karena ternyata hampir
+semua foto di LOL dataset paling bagus dengan tile 4×4. Modelnya
+belajar pola ini dengan sangat konsisten.
+
+--------------------------------------------------------------------
+  BABAK 6 — EVALUASI: NGUKUR SEBERAPA BAGUS HASILNYA
+--------------------------------------------------------------------
+
+Kita punya empat cara ngukur kualitas hasil enhancement:
+
+PSNR (Peak Signal-to-Noise Ratio) — butuh foto asli
+  Ukur seberapa dekat hasil enhancement ke foto referensi secara
+  matematis (per-pixel). Satuannya decibel (dB). Makin tinggi makin
+  baik. Tapi PSNR bisa menipu — foto noisy yang dekat secara
+  pixel bisa PSNR tinggi tapi keliatan jelek.
+
+SSIM (Structural Similarity Index) — butuh foto asli
+  Ukur kemiripan struktur, luminance, dan kontras antara hasil
+  enhancement dan foto referensi. Range 0–1, target kita > 0.80.
+  Lebih cocok dengan persepsi visual manusia daripada PSNR.
+
+Histogram Uniformity — TANPA butuh foto asli
+  Ukur seberapa rata distribusi pixel tersebar di rentang 0–255.
+  Ini langsung mengukur tujuan utama histogram equalization!
+  Rumusnya: 1 dikurangi jarak L1 antara histogram kita
+  dengan distribusi ideal yang benar-benar flat.
+  Range 0–1, makin tinggi makin merata.
+
+Entropy — TANPA butuh foto asli
+  Ukur kekayaan informasi dalam histogram. Foto yang tonalnya
+  beragam punya entropy tinggi. Rumus: -Σ p(i) × log2(p(i)).
+
+Kenapa kita butuh yang "tanpa foto asli"? Karena di dunia nyata,
+user yang upload foto gelap mereka ga punya foto referensi normalnya.
+Jadi kita butuh cara ngukur kualitas tanpa referensi.
+
+Temuan menarik: GHE ternyata bisa bikin Uniformity dan Entropy
+TURUN dari foto aslinya. Ini paradoks — method yang harusnya
+bikin histogram lebih rata, malah bikin kurang rata untuk
+foto-foto dengan distribusi pixel yang kompleks. CLAHE menang
+telak di sini: Uniformity naik +0.20, Entropy naik +1.07.
+
+--------------------------------------------------------------------
+  BABAK 7 — SISTEM PILIH HASIL TERBAIK OTOMATIS
+--------------------------------------------------------------------
+
+Setelah GHE dan CLAHE dijalankan, sistem perlu putuskan:
+mana yang lebih bagus untuk user?
+
+Kalau user upload foto referensi (ground truth):
+  → Bandingkan SSIM keduanya. Yang SSIM lebih tinggi = pemenang.
+  → Objektif, terukur, akurat.
+
+Kalau user ga punya foto referensi:
+  → Pakai heuristic score. Kita hitung skor komposit:
+
+  Score = 0.30 × Entropy
+        + 0.20 × Brightness_balance × 10
+        + 0.15 × Contrast × 10
+        + 0.35 × Noise_score × 10
+
+  Noise_score = 1 / (1 + Laplacian_variance / 800)
+  (makin tinggi noise, makin rendah skor ini)
+
+  Laplacian variance mengukur "kekasaran" gambar — gambar noisy
+  punya nilai Laplacian tinggi. Ini yang bikin GHE sering kalah:
+  GHE amplify noise, jadi Laplacian variance-nya tinggi,
+  Noise_score-nya rendah, total skor-nya kalah dari CLAHE.
+
+  Plus ada tiebreak: kalau GHE menang tapi selisihnya kurang dari
+  15%, sistem tetap pilih CLAHE. Karena secara fundamental CLAHE
+  lebih controlled dan less noisy.
+
+--------------------------------------------------------------------
+  BABAK 8 — APLIKASI WEB: BUNGKUS SEMUA DALAM UI
+--------------------------------------------------------------------
+
+Semua yang di atas kita bungkus dalam Streamlit app yang bisa
+diakses lewat browser. Ini yang user lihat:
+
+1. Upload foto atau ambil dari kamera browser
+2. Pilih mode:
+   - Manual: atur clip_limit dan tile_size sendiri pakai slider
+   - Auto ML: biarkan AI yang putuskan parameternya
+
+3. Sistem jalan:
+   - Foto masuk ke pipeline BGR → LAB → equalize L → balik BGR
+   - Kalau Auto ML: 10 fitur diekstrak, Exposure Classifier
+     klasifikasi kondisi foto, Parameter Predictor kasih
+     clip & tile terbaik untuk foto itu
+   - GHE dan CLAHE dijalankan paralel dari foto yang sama
+
+4. Tampil 3 kolom: Original | Hasil GHE | Hasil CLAHE
+   Di bawah masing-masing ada tombol download.
+
+5. Badge ML muncul: 🔵 UNDEREXPOSED / 🟢 NORMAL / 🟡 OVEREXPOSED
+   Kalau "NORMAL" → muncul warning bahwa enhancement minimal.
+
+6. Panel metrics:
+   - Kalau ada ground truth: PSNR dan SSIM vs referensi
+   - Selalu tampil: Uniformity dan Entropy (dengan delta vs original)
+
+7. Seksi "⭐ Best Result":
+   - Sistem auto-pilih mana yang lebih bagus (GHE atau CLAHE)
+   - Tampil gambar pemenang + penjelasan kenapa dia menang
+   - Tombol "⬇️ Download Best Result"
+
+--------------------------------------------------------------------
+  PENUTUP — APA YANG SUDAH KITA CAPAI
+--------------------------------------------------------------------
+
+Dari pertanyaan "gimana komputer bisa otomatis benerin foto?",
+kita berhasil bangun sistem end-to-end yang:
+
+✅ Bisa terima foto gelap maupun terang
+✅ Terapkan dua method (GHE + CLAHE) dan bandingkan keduanya
+✅ Punya "otak" ML yang tau foto itu gelap, terang, atau normal
+✅ Punya "otak" ML kedua yang tau parameter terbaik untuk foto itu
+✅ Ngukur kualitas hasil baik dengan maupun tanpa foto referensi
+✅ Otomatis pilih hasil terbaik untuk user
+✅ Semua dibungkus dalam web app yang bisa langsung dipakai
+
+Angka-angka yang kita capai:
+  - CLAHE (clip=4.0, tile=4×4): SSIM 0.4519 → unggul dari GHE
+  - Exposure Classifier: 96.28% accuracy (target 85%) ✅ — real SICE data
+  - Parameter Predictor clip: MAE 0.0837 (sangat kecil) ✅
+  - Parameter Predictor tile: 99.59% accuracy ✅
+
+Apakah SSIM kita capai target > 0.80? Belum.
+Tapi itu wajar — method deep learning terbaik di dunia pun
+cuma capai 0.55–0.75 di dataset ini. Classical histogram methods
+memang ada batasnya. Yang penting: CLAHE kita terbukti lebih baik
+dari GHE, dan sistem ML kita berhasil otomasi proses yang
+tadinya harus dilakukan manual.
+
+Limitasi yang masih ada:
+  - Data overexposed sudah real (SICE Part2), tapi jumlahnya masih
+    186 vs 485 untuk kelas lain — class imbalance belum sepenuhnya
+    teratasi. Kalau nanti ada lebih banyak data overexposed nyata,
+    akurasi classifier bisa naik lebih lagi.
+  - Sistem belum diuji di luar distribusi LOL dataset — foto dari
+    kondisi yang sangat berbeda (misalnya foto medis, foto infrared)
+    belum tentu ditangani dengan baik.
+
+Itulah cerita project kita. 🎉
+
+====================================================================
+  Team 2 | COMP7116001 Computer Vision | Binus University 2025/2026
+====================================================================
