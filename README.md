@@ -1,6 +1,6 @@
 # Automated Contrast Correction System
 
-Sistem koreksi kontras otomatis untuk foto *under-exposed* dan *over-exposed* menggunakan **Global Histogram Equalization (GHE)** dan **CLAHE**, dilengkapi klasifikasi eksposur berbasis Machine Learning (Random Forest).
+Sistem koreksi kontras otomatis untuk foto under-exposed dan over-exposed menggunakan Global Histogram Equalization (GHE) dan CLAHE, dilengkapi klasifikasi eksposur berbasis Machine Learning (Random Forest).
 
 > Tugas Akhir COMP7116001 — Computer Vision | Binus University Semester 4
 
