@@ -21,13 +21,6 @@ Sistem koreksi kontras otomatis untuk foto *under-exposed* dan *over-exposed* me
 Input (BGR) → LAB → Equalize L channel (GHE / CLAHE) → LAB → Output (BGR)
 ```
 
-## ML Model
-
-| Model | Metode | Performa |
-|---|---|---|
-| Exposure Classifier | Random Forest | Accuracy 96.28% |
-| Clip Limit Predictor | Random Forest Regressor | MAE 0.0837 |
-| Tile Size Predictor | Random Forest Classifier | Accuracy 99.59% |
 
 ## Dataset
 
