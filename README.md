@@ -59,3 +59,16 @@ streamlit run app.py #atau menyesuaikan environment device
 | 2802484470 | Jason Firenze Trianto |
 | 2802488185 | Keanu Stadeva |
 | 2802484483 | Rafifdiya |
+
+## Limitasi
+
+- **Class imbalance** — Data overexposed (SICE): 186 sampel vs 485 untuk kelas under/normal
+- **Gap ke deep learning** — SSIM 0.4519 vs metode DL state-of-the-art (0.55–0.75)
+- **Distribusi terbatas** — Hanya diuji pada LOL dataset (indoor low-light); belum divalidasi di kondisi lain
+
+## Future Work
+
+- Integrasi modul neural enhancement ringan (Zero-DCE) sebagai mode opsional
+- Ekspansi data overexposed di luar SICE Part2 untuk generalisasi classifier
+- Ekstensi ke video stream dengan temporal consistency
+- Mobile deployment via ONNX / TFLite
