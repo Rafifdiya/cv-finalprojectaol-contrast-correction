@@ -38,19 +38,6 @@ Dataset tidak diikutkan di repo. Download manual:
 | LOL (Low-Light Object) | Underexposed + normal pairs (485 train, 15 test) | [Kaggle](https://www.kaggle.com/datasets/soumikrakshit/lol-dataset) |
 | SICE Part 2 | Overexposed images (186 gambar) | [GitHub](https://github.com/csjcai/SICE) |
 
-Setelah download, taruh di:
-```
-dataset/
-├── train/
-│   ├── low/      ← LOL low-light images
-│   ├── normal/   ← LOL ground truth
-│   └── over/     ← SICE overexposed images
-└── test/
-    ├── low/
-    └── normal/
-```
-
-> Model `.pkl` sudah ter-train dan tersimpan di `ml/models/` — **tidak perlu download dataset untuk menjalankan app**.
 
 ## Cara Menjalankan
 
