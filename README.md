@@ -59,7 +59,7 @@ dataset/
 pip install -r requirements.txt
 
 # Jalankan app
-streamlit run app.py
+streamlit run app.py #atau menyesuaikan environment device
 ```
 
 ## Tim
